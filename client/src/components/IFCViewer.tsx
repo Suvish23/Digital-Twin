@@ -3,45 +3,60 @@ import * as OBC from "@thatopen/components";
 import * as OBCF from "@thatopen/components-front";
 import * as WEBIFC from "web-ifc";
 import axios from "axios";
-
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 const IFCViewer: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const uiRef = useRef<HTMLDivElement>(null);
   const [guid, setGuid] = useState("");
-  const [ sensorValues, setSensorValues] = useState({});
+  const [activeTab, setActiveTab] = useState<"temperature" | "humidity" | "pressure">("temperature");
+
+  const [sensorData, setSensorData] = useState({
+    temperature: [],
+    humidity: [],
+    pressure: [],
+  });
+
   const [selectedProps, setSelectedProps] = useState<{
-        Class?: string;
-        GlobalId?: string;
-        Name?: string;
-        Description?: string;
-        LongName?: string;
-        InteriorOrExteriorSpace?: string;
-      } | null>(null);
+    Class?: string;
+    GlobalId?: string;
+    Name?: string;
+  } | null>(null);
 
-
-const fetchInfo = async () => {
-  if (!guid) return;
-
-  try {
-    const response = await axios.get("http://localhost:8000/sensorData", {
-      params: { guid }
-    });
-    setSensorValues(response.data.sensors || {});
-    console.log("Fetched sensor bundle:", response.data.sensors);
-  } catch (error) {
-    console.error("Error fetching sensor bundle:", error);
-  }
-};
-
+  const fetchInfo = async () => {
+    if (!guid) return;
+    try {
+      const response = await axios.get("http://localhost:8000/sensorData", { params: { guid } });
+      setSensorData(response.data.sensors || {
+        temperature: [],
+        humidity: [],
+        pressure: [],
+      });
+      console.log("Fetched sensor bundle:", response.data.sensors);
+    } catch (error) {
+      console.error("Error fetching sensor bundle:", error);
+    }
+  };
 
   useEffect(() => {
     async function init() {
-      if (!containerRef.current || !uiRef.current) return;
+      if (!containerRef.current) return;
 
+      while (containerRef.current.firstChild) {
+      containerRef.current.removeChild(containerRef.current.firstChild);
+    }
 
       const components = new OBC.Components();
       const worlds = components.get(OBC.Worlds);
+
       const world = worlds.create<
         OBC.SimpleScene,
         OBC.SimpleCamera,
@@ -61,7 +76,6 @@ const fetchInfo = async () => {
       const grids = components.get(OBC.Grids);
       grids.create(world);
 
-      //const fragments = components.get(OBC.FragmentsManager);
       const ifcLoader = components.get(OBC.IfcLoader);
       await ifcLoader.setup({
         wasm: {
@@ -89,47 +103,37 @@ const fetchInfo = async () => {
         world.scene.three.add(model);
 
         const indexer = components.get(OBC.IfcRelationsIndexer);
-        console.log("[IFCViewer] Indexing relations...");
         await indexer.process(model);
-        console.log("[IFCViewer] Indexing complete.");
-
 
         const highlighter = components.get(OBCF.Highlighter);
         highlighter.setup({ world });
 
-
-
         highlighter.events.select.onHighlight.add(async (fragmentIdMap) => {
-          console.log("[IFCViewer] Highlighted:", fragmentIdMap);
-
-
           for (const [modelID, set] of Object.entries(fragmentIdMap)) {
-  for (const id of set) {
-    const props = await model.getProperties(Number(id));
-    console.log("IFC Props:", props);
-
-    if (props) {
-      setGuid(props.GlobalId?.value);
-
-      setSelectedProps({
-        Class: props.type,
-        GlobalId: props.GlobalId?.value,
-        Name: props.Name?.value,
-        Description: props.Description?.value || "N/A",
-        LongName: props.LongName?.value,
-        InteriorOrExteriorSpace: props.InteriorOrExteriorSpace?.value,
-      });
-    }
-  }
-}
+            for (const id of set) {
+              const props = await model.getProperties(Number(id));
+              if (props) {
+                setSensorData({
+          temperature: [],
+          humidity: [],
+          pressure: [],
+        });
+        setActiveTab("temperature"); 
+                setGuid(props.GlobalId?.value);
+                setSelectedProps({
+                  Class: props.type,
+                  GlobalId: props.GlobalId?.value,
+                  Name: props.Name?.value,
+                });
+              }
+            }
+          }
         });
 
-        
-
-        highlighter.events.select.onClear.add(() => {
-          console.log("[IFCViewer] Selection cleared.");
-        });
-
+        // highlighter.events.select.onClear.add(() => {
+        //   setSelectedProps(null);
+        //   setGuid("");
+        // });
       }
 
       await loadIfc();
@@ -142,44 +146,122 @@ const fetchInfo = async () => {
     init();
   }, []);
 
-  return (
-    <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
-      <div
-        ref={uiRef}
-        style={{
-          width: "25rem",
-          overflow: "auto",
-          padding: "1rem",
-          borderRight: "1px solid #ddd",
-        }}
-      />
-      <div
-        ref={containerRef}
-        
-        style={{ flex: 1, height: "100vh", position: "relative" }}
-      />
-      {selectedProps && (
-  <div style={{ padding: "1rem", maxWidth: "600px" }}>
-    <h2>Selected Element Properties</h2>
-     <button onClick={fetchInfo} style={{ marginBottom: "1rem" }}>
-      Fetch Info from Backend
-    </button>   
-    <table border={1} cellPadding={8} style={{ width: "100%", borderCollapse: "collapse" }}>
-      <tbody>
-        <tr><th>Attribute</th><th>Value</th></tr>
-        <tr><td>Class</td><td>{selectedProps.Class}</td></tr>
-        <tr><td>GlobalId</td><td>{selectedProps.GlobalId}</td></tr>
-        <tr><td>Name</td><td>{selectedProps.Name}</td></tr>
-        <tr><td>Description</td><td>{selectedProps.Description}</td></tr>
-        <tr><td>LongName</td><td>{selectedProps.LongName}</td></tr>
-        <tr><td>InteriorOrExteriorSpace</td><td>{selectedProps.InteriorOrExteriorSpace}</td></tr>
-      </tbody>
-    </table>
-  </div>
-)}
+  const renderChart = (type: "temperature" | "humidity" | "pressure") => {
+    let color = "";
+    let name = "";
+    let yDomain: [number, number] | undefined = undefined;
 
+    switch (type) {
+      case "temperature":
+        color = "#ff7300";
+        name = "Temperature (°C)";
+        break;
+      case "humidity":
+        color = "#387908";
+        name = "Humidity (%)";
+        yDomain = [0, 100];
+        break;
+      case "pressure":
+        color = "#8884d8";
+        name = "Pressure (hPa)";
+        break;
+    }
+
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={sensorData[type]}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="timestamp" tickFormatter={(tick) => tick.slice(11, 16)} />
+          <YAxis domain={yDomain} />
+          <Tooltip labelFormatter={(label) => `Time: ${label}`} />
+          <Legend />
+          <Line type="monotone" dataKey="value" stroke={color} name={name} />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  };
+
+  return (
+  <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
+    <div
+      ref={containerRef}
+      style={{
+        flex: 1,
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    />
+
+    <div
+      style={{
+        width: "400px",
+        padding: "1rem",
+        overflowY: "auto",
+        background: "#fff",
+        boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+      }}
+    >
+      {!selectedProps ? (
+        <div style={{ fontStyle: "italic", color: "#666" }}>
+          Please select a fragment in the model to view its properties.
+        </div>
+      ) : (
+        <>
+          <h2>Selected Element Properties</h2>
+          <button onClick={fetchInfo} style={{ marginBottom: "1rem" }}>
+            Fetch Info from Backend
+          </button>
+
+          <table
+            border={1}
+            cellPadding={8}
+            style={{ width: "100%", borderCollapse: "collapse" }}
+          >
+            <tbody>
+              <tr>
+                <th>Attribute</th>
+                <th>Value</th>
+              </tr>
+              <tr>
+                <td>Class</td>
+                <td>{selectedProps.Class}</td>
+              </tr>
+              <tr>
+                <td>GlobalId</td>
+                <td>{selectedProps.GlobalId}</td>
+              </tr>
+              <tr>
+                <td>Name</td>
+                <td>{selectedProps.Name}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style={{ marginTop: "2rem" }}>
+            <div style={{ marginBottom: "1rem" }}>
+              {["temperature", "humidity", "pressure"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setActiveTab(type as any)}
+                  style={{
+                    marginRight: "1rem",
+                    backgroundColor:
+                      activeTab === type ? "#ccc" : "transparent",
+                  }}
+                >
+                  {type[0].toUpperCase() + type.slice(1)}
+                </button>
+              ))}
+            </div>
+            {renderChart(activeTab)}
+          </div>
+        </>
+      )}
     </div>
-  );
+  </div>
+);
+
 };
 
 export default IFCViewer;
