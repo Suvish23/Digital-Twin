@@ -11,7 +11,7 @@ def on_connect(client, userdata, flags, rc):
     print("Connected with result code", rc)
     client.subscribe(TOPIC)
 
-def on_message(msg):
+def on_message(client, userdata, msg):
     try:
         data = json.loads(msg.payload.decode())
         guid = data.get("guid")
@@ -27,6 +27,8 @@ def on_message(msg):
             print(f"Stored {sensor_type} for {guid}: {value}")
     except Exception as e:
         print("Error in on_message:", e)
+        import traceback
+        traceback.print_exc()
 
 def start_mqtt():
     client = mqtt.Client()

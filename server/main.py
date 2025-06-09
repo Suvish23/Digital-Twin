@@ -32,7 +32,6 @@ USERS = {
     "suvish": {"password": "1234", "role": "user"},
 }
 
-
 class LoginResponse(BaseModel):
     token: str
     role: str

@@ -25,6 +25,8 @@ const IFCViewer: React.FC = () => {
     pressure: [],
   });
 
+  const [hasData, setHasData] = useState(false);
+
   const [selectedProps, setSelectedProps] = useState<{
     Class?: string;
     GlobalId?: string;
@@ -32,27 +34,45 @@ const IFCViewer: React.FC = () => {
   } | null>(null);
 
   const fetchInfo = async () => {
-    if (!guid) return;
-    try {
-      const response = await axios.get("http://localhost:8000/sensorData", { params: { guid } });
-      setSensorData(response.data.sensors || {
-        temperature: [],
-        humidity: [],
-        pressure: [],
-      });
-      console.log("Fetched sensor bundle:", response.data.sensors);
-    } catch (error) {
-      console.error("Error fetching sensor bundle:", error);
+  if (!guid) return;
+
+  try {
+    const response = await axios.get("http://localhost:8000/sensorData", { params: { guid } });
+
+    const sensors = response.data.sensors || {
+      temperature: [],
+      humidity: [],
+      pressure: [],
+    };
+
+    const hasAnyData =
+      sensors.temperature.length > 0 ||
+      sensors.humidity.length > 0 ||
+      sensors.pressure.length > 0;
+
+    setSensorData(sensors);
+    setHasData(hasAnyData);
+
+    console.log("Fetched sensor bundle:", sensors);
+    console.log("hasAnyData =", hasAnyData); 
+
+    if (!hasAnyData) {
+      alert("There is no data to plot.");
     }
-  };
+  } catch (error) {
+    console.error("Error fetching sensor bundle:", error);
+    setHasData(false);
+  }
+};
+
 
   useEffect(() => {
     async function init() {
       if (!containerRef.current) return;
 
       while (containerRef.current.firstChild) {
-      containerRef.current.removeChild(containerRef.current.firstChild);
-    }
+        containerRef.current.removeChild(containerRef.current.firstChild);
+      }
 
       const components = new OBC.Components();
       const worlds = components.get(OBC.Worlds);
@@ -114,11 +134,13 @@ const IFCViewer: React.FC = () => {
               const props = await model.getProperties(Number(id));
               if (props) {
                 setSensorData({
-          temperature: [],
-          humidity: [],
-          pressure: [],
-        });
-        setActiveTab("temperature"); 
+                  temperature: [],
+                  humidity: [],
+                  pressure: [],
+                });
+                console.log("Check the Model Id : ",modelID);
+                setHasData(false);
+                setActiveTab("temperature");
                 setGuid(props.GlobalId?.value);
                 setSelectedProps({
                   Class: props.type,
@@ -129,11 +151,6 @@ const IFCViewer: React.FC = () => {
             }
           }
         });
-
-        // highlighter.events.select.onClear.add(() => {
-        //   setSelectedProps(null);
-        //   setGuid("");
-        // });
       }
 
       await loadIfc();
@@ -182,86 +199,102 @@ const IFCViewer: React.FC = () => {
   };
 
   return (
-  <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
-    <div
-      ref={containerRef}
-      style={{
-        flex: 1,
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    />
+    <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
+      <div
+        ref={containerRef}
+        style={{
+          flex: 1,
+          height: "100%",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      />
 
-    <div
-      style={{
-        width: "400px",
-        padding: "1rem",
-        overflowY: "auto",
-        background: "#fff",
-        boxShadow: "0 0 10px rgba(0,0,0,0.1)",
-      }}
-    >
-      {!selectedProps ? (
-        <div style={{ fontStyle: "italic", color: "#666" }}>
-          Please select a fragment in the model to view its properties.
-        </div>
-      ) : (
-        <>
-          <h2>Selected Element Properties</h2>
-          <button onClick={fetchInfo} style={{ marginBottom: "1rem" }}>
-            Fetch Info from Backend
-          </button>
-
-          <table
-            border={1}
-            cellPadding={8}
-            style={{ width: "100%", borderCollapse: "collapse" }}
-          >
-            <tbody>
-              <tr>
-                <th>Attribute</th>
-                <th>Value</th>
-              </tr>
-              <tr>
-                <td>Class</td>
-                <td>{selectedProps.Class}</td>
-              </tr>
-              <tr>
-                <td>GlobalId</td>
-                <td>{selectedProps.GlobalId}</td>
-              </tr>
-              <tr>
-                <td>Name</td>
-                <td>{selectedProps.Name}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: "2rem" }}>
-            <div style={{ marginBottom: "1rem" }}>
-              {["temperature", "humidity", "pressure"].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setActiveTab(type as any)}
-                  style={{
-                    marginRight: "1rem",
-                    backgroundColor:
-                      activeTab === type ? "#ccc" : "transparent",
-                  }}
-                >
-                  {type[0].toUpperCase() + type.slice(1)}
-                </button>
-              ))}
-            </div>
-            {renderChart(activeTab)}
+      <div
+        style={{
+          width: "400px",
+          padding: "1rem",
+          overflowY: "auto",
+          background: "#fff",
+          boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+          borderLeft: "1px solid #ddd",
+        }}
+      >
+        {!selectedProps ? (
+          <div style={{ fontStyle: "italic", color: "#666" }}>
+            Please select a fragment in the model to view its properties.
           </div>
-        </>
-      )}
-    </div>
-  </div>
-);
+        ) : (
+          <>
+            <h2>Selected Element Properties</h2>
+            <button
+              onClick={fetchInfo}
+              style={{
+                marginBottom: "1rem",
+                padding: "0.5rem 1rem",
+                border: "1px solid #888",
+                background: "#f0f0f0",
+                cursor: "pointer",
+              }}
+            >
+              Fetch Info from Backend
+          
+            </button>
+          
 
+            <table
+              border={1}
+              cellPadding={8}
+              style={{ width: "100%", borderCollapse: "collapse" }}
+            >
+              <tbody>
+                <tr>
+                  <th>Attribute</th>
+                  <th>Value</th>
+                </tr>
+                <tr>
+                  <td>Class</td>
+                  <td>{selectedProps.Class}</td>
+                </tr>
+                <tr>
+                  <td>GlobalId</td>
+                  <td>{selectedProps.GlobalId}</td>
+                </tr>
+                <tr>
+                  <td>Name</td>
+                  <td>{selectedProps.Name}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {hasData && (
+              <div style={{ marginTop: "2rem" }}>
+                <div style={{ marginBottom: "1rem" }}>
+                  {["temperature", "humidity", "pressure"].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setActiveTab(type as any)}
+                      style={{
+                        marginRight: "1rem",
+                        backgroundColor: activeTab === type ? "#ccc" : "transparent",
+                        border: "1px solid #999",
+                        padding: "0.3rem 0.6rem",
+                      }}
+                    >
+                      {type[0].toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                  
+                </div>
+
+                {renderChart(activeTab)}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default IFCViewer;
