@@ -2,7 +2,7 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import Dashboard from "./DashBoard";
 import PrivateRoute from "../components/PrivateRoute";
-import IFCViewer from "../components/IFCViewer";
+import {IFCViewer} from "../components/IFCViewer";
 
 const ProtectedRoutes = () => {
   return (

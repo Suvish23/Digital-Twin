@@ -4,6 +4,7 @@ import axios from "axios";
 interface AuthContextType {
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
+   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +26,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     console.log("Token updated:", token);
   }, [token]);
 
+
+
+  const logout = () => {
+    setToken(null);
+    localStorage.removeItem("token");
+  };
   const login = async (username: string, password: string) => {
   try {
     const res = await axios.post("http://localhost:8000/login", {
@@ -33,7 +40,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
     setToken(res.data.token);
   } catch (err: any) {
-    // Handle different error statuses clearly
     if (axios.isAxiosError(err)) {
       if (err.response?.status === 401) {
         alert("User does not exist.");
@@ -50,5 +56,5 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 };
 
 
-  return <AuthContext.Provider value={{ token, login }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ token, login ,logout  }}>{children}</AuthContext.Provider>;
 };

@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const IFCViewer: React.FC = () => {
+export const IFCViewer  = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [guid, setGuid] = useState("");
   const [activeTab, setActiveTab] = useState<"temperature" | "humidity" | "pressure">("temperature");
@@ -296,5 +296,3 @@ const IFCViewer: React.FC = () => {
     </div>
   );
 };
-
-export default IFCViewer;
