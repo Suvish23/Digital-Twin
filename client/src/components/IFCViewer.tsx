@@ -17,6 +17,7 @@ import {
 export const IFCViewer  = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [guid, setGuid] = useState("");
+  const [sensor_name, setSensorName] = useState("");
   const [activeTab, setActiveTab] = useState<"temperature" | "humidity" | "pressure">("temperature");
 
   const [sensorData, setSensorData] = useState({
@@ -34,10 +35,10 @@ export const IFCViewer  = () => {
   } | null>(null);
 
   const fetchInfo = async () => {
-  if (!guid) return;
+  if (!sensor_name) return;
 
   try {
-    const response = await axios.get("http://localhost:8000/sensorData", { params: { guid } });
+    const response = await axios.get("http://localhost:8000/sensorData", { params: { sensor_name } });
 
     const sensors = response.data.sensors || {
       temperature: [],
@@ -142,6 +143,7 @@ export const IFCViewer  = () => {
                 setHasData(false);
                 setActiveTab("temperature");
                 setGuid(props.GlobalId?.value);
+                setSensorName(props.Name?.value);
                 setSelectedProps({
                   Class: props.type,
                   GlobalId: props.GlobalId?.value,

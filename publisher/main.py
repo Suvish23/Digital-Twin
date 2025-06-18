@@ -70,6 +70,7 @@ def protected(token: str = ""):
 @app.get("/sensorData")
 def get_sensor_data_all(sensor_name: str = Query(...)):
     print(sensor_name)
+    print("came here")
     db = SessionLocal()
     result = {"Numerical": [], "NonNumerical": []}
 
