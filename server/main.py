@@ -69,7 +69,6 @@ def protected(token: str = ""):
 
 @app.get("/sensorData")
 def get_sensor_data_all(sensor_name: str = Query(...)):
-    sensor_name="BP-NT-53-01"
     print(sensor_name)
     db = SessionLocal()
     result = {"Numerical": [], "NonNumerical": []}
@@ -99,8 +98,6 @@ def get_sensor_data_all(sensor_name: str = Query(...)):
             "value": entry.value,
             "time": entry.time.isoformat(),
         })
-
-    print(result)
 
     db.close()
     return {"sensor_name": sensor_name, "data": result}

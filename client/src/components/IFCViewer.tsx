@@ -14,35 +14,17 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-type SensorPoint = {
-  value: number;
-  timestamp: string;
-};
-
-type SensorData = {
-  temperature: SensorPoint[];
-  humidity: SensorPoint[];
-  pressure: SensorPoint[];
-};
-
-
-
 export const IFCViewer  = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [guid, setGuid] = useState("");
   const [sensor_name, setSensorName] = useState("");
   const [activeTab, setActiveTab] = useState<"temperature" | "humidity" | "pressure">("temperature");
 
- const [sensorData, setSensorData] = useState<SensorData>({
+  const [sensorData, setSensorData] = useState({
     temperature: [],
     humidity: [],
     pressure: [],
   });
-
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
-  const [quickRange, setQuickRange] = useState<string>("All");
-
 
   const [hasData, setHasData] = useState(false);
 
@@ -52,108 +34,37 @@ export const IFCViewer  = () => {
     Name?: string;
   } | null>(null);
 
- const fetchInfo = async () => {
-    if (!sensor_name) return;
+  const fetchInfo = async () => {
+  if (!sensor_name) return;
 
-    try {
-      const response = await axios.get("http://localhost:8000/sensorData", {
-        params: { sensor_name },
-      });
+  try {
+    const response = await axios.get("http://localhost:8000/sensorData", { params: { sensor_name } });
 
-      type SensorEntry = {
-        channel_id: number;
-        value: number;
-        time: string;
-      };
+    const sensors = response.data.sensors || {
+      temperature: [],
+      humidity: [],
+      pressure: [],
+    };
 
-      const numericalData: SensorEntry[] = response.data.data?.Numerical || [];
+    const hasAnyData =
+      sensors.temperature.length > 0 ||
+      sensors.humidity.length > 0 ||
+      sensors.pressure.length > 0;
 
-      const transformedData: SensorData = {
-        temperature: [],
-        humidity: [],
-        pressure: [],
-      };
+    setSensorData(sensors);
+    setHasData(hasAnyData);
 
-      numericalData.forEach((entry: SensorEntry) => {
-        const dataPoint: SensorPoint = {
-          value: entry.value,
-          timestamp: entry.time,
-        };
+    console.log("Fetched sensor bundle:", sensors);
+    console.log("hasAnyData =", hasAnyData); 
 
-        switch (entry.channel_id) {
-          case 101:
-            transformedData.temperature.push(dataPoint);
-            break;
-          case 102:
-            transformedData.humidity.push(dataPoint);
-            break;
-          case 103:
-            transformedData.pressure.push(dataPoint);
-            break;
-          default:
-            break;
-        }
-      });
-
-      const hasAnyData =
-        transformedData.temperature.length > 0 ||
-        transformedData.humidity.length > 0 ||
-        transformedData.pressure.length > 0;
-
-      setSensorData(transformedData);
-      setHasData(hasAnyData);
-
-      console.log("Fetched sensor bundle:", transformedData);
-      console.log("hasAnyData =", hasAnyData);
-
-      if (!hasAnyData) {
-        alert("There is no data to plot.");
-      }
-    } catch (error) {
-      console.error("Error fetching sensor bundle:", error);
-      setHasData(false);
+    if (!hasAnyData) {
+      alert("There is no data to plot.");
     }
-  };
-
-  const filterDataByDate = (data: SensorPoint[]): SensorPoint[] => {
-  const from = fromDate ? new Date(fromDate) : null;
-  const to = toDate ? new Date(toDate) : null;
-
-  return data.filter((entry) => {
-    const entryDate = new Date(entry.timestamp);
-    const afterFrom = from ? entryDate >= from : true;
-    const beforeTo = to ? entryDate <= to : true;
-    return afterFrom && beforeTo;
-  });
-};
-
-const applyQuickFilter = (range: string): void => {
-  const now = new Date();
-  let from: Date | null = null;
-
-  switch (range) {
-    case "7d":
-      from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case "30d":
-      from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case "6m":
-      from = new Date(now.setMonth(now.getMonth() - 6));
-      break;
-    case "all":
-    default:
-      from = null;
-      break;
+  } catch (error) {
+    console.error("Error fetching sensor bundle:", error);
+    setHasData(false);
   }
-
-  setQuickRange(range);
-  setFromDate(from ? from.toISOString().split("T")[0] : "");
-  setToDate("");
 };
-
-
-
 
 
   useEffect(() => {
@@ -255,29 +166,39 @@ const applyQuickFilter = (range: string): void => {
   }, []);
 
   const renderChart = (type: "temperature" | "humidity" | "pressure") => {
-  let color = "", name = "";
-  switch (type) {
-    case "temperature": color = "#ff7300"; name = "Temperature (°C)"; break;
-    case "humidity": color = "#387908"; name = "Humidity (%)"; break;
-    case "pressure": color = "#8884d8"; name = "Pressure (hPa)"; break;
-  }
+    let color = "";
+    let name = "";
+    let yDomain: [number, number] | undefined = undefined;
 
-  const filtered = filterDataByDate(sensorData[type]);
+    switch (type) {
+      case "temperature":
+        color = "#ff7300";
+        name = "Temperature (°C)";
+        break;
+      case "humidity":
+        color = "#387908";
+        name = "Humidity (%)";
+        yDomain = [0, 100];
+        break;
+      case "pressure":
+        color = "#8884d8";
+        name = "Pressure (hPa)";
+        break;
+    }
 
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={filtered}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="timestamp" tickFormatter={(tick) => tick.slice(11, 16)} />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="value" stroke={color} name={name} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-};
-
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={sensorData[type]}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="timestamp" tickFormatter={(tick) => tick.slice(11, 16)} />
+          <YAxis domain={yDomain} />
+          <Tooltip labelFormatter={(label) => `Time: ${label}`} />
+          <Legend />
+          <Line type="monotone" dataKey="value" stroke={color} name={name} />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  };
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
@@ -347,23 +268,6 @@ const applyQuickFilter = (range: string): void => {
                 </tr>
               </tbody>
             </table>
-<div style={{ marginBottom: "1rem" }}>
-  <label style={{ marginRight: "0.5rem" }}>From:</label>
-  <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-
-  <label style={{ margin: "0 0.5rem" }}>To:</label>
-  <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-
-  <div style={{ marginTop: "0.5rem" }}>
-    <label>Quick Range: </label>
-    <select value={quickRange} onChange={(e) => applyQuickFilter(e.target.value)}>
-      <option value="all">All</option>
-      <option value="7d">Last 7 Days</option>
-      <option value="30d">Last 30 Days</option>
-      <option value="6m">Last 6 Months</option>
-    </select>
-  </div>
-</div>
 
             {hasData && (
               <div style={{ marginTop: "2rem" }}>
