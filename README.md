@@ -104,8 +104,3 @@ This project was developed as part of my Master's Research Project in Computer S
 **Suvish Sunilkumar Jain**
 [LinkedIn](https://www.linkedin.com/in/suvish-sunilkumar-jain-702766168) · [GitHub](https://github.com/Suvish23)
 
----
-
-## 📝 License
-
-MIT
